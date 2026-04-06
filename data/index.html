@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Dashboard ESP32</title>
+
+<style>
+  body {
+    background: #f2f2f2;
+    font-family: Arial;
+    padding: 20px;
+  }
+  .card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+  }
+  .title {
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  .value {
+    font-size: 18px;
+    margin-bottom: 5px;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>ESP32 – DHT22 Dashboard</h1>
+
+<div id="salle1" class="card"></div>
+<div id="salle2" class="card"></div>
+
+<script>
+async function update() {
+  try {
+    let res = await fetch("/api/data");
+    let data = await res.json();
+
+    document.getElementById("salle1").innerHTML = `
+      <div class="title">Salle 1</div>
+      <div class="value">Température: ${data.salle1.temp} °C</div>
+      <div class="value">Humidité: ${data.salle1.hum} %</div>
+      <div class="value">Statut: ${data.salle1.status}</div>
+    `;
+
+    document.getElementById("salle2").innerHTML = `
+      <div class="title">Salle 2</div>
+      <div class="value">Température: ${data.salle2.temp} °C</div>
+      <div class="value">Humidité: ${data.salle2.hum} %</div>
+      <div class="value">Statut: ${data.salle2.status}</div>
+    `;
+  } catch (e) {
+    document.getElementById("salle1").innerHTML = "<b>Erreur : ESP32 introuvable</b>";
+  }
+}
+
+setInterval(update, 2000);
+update();
+</script>
+
+</body>
+</html>
