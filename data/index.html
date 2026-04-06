@@ -1,68 +1,372 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Dashboard ESP32</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 – Surveillance Salles</title>
 
-<style>
-  body {
-    background: #f2f2f2;
-    font-family: Arial;
-    padding: 20px;
-  }
-  .card {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
-  }
-  .title {
-    font-size: 22px;
-    font-weight: bold;
-    margin-bottom: 10px;
-  }
-  .value {
-    font-size: 18px;
-    margin-bottom: 5px;
-  }
-</style>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1c1f2e;
+      --card:     #252840;
+      --border:   #353860;
+      --accent:   #6c8ef5;
+      --ok:       #4ade80;
+      --warn:     #facc15;
+      --danger:   #f87171;
+      --text:     #e2e8f0;
+      --muted:    #8b92b0;
+      --radius:   14px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 24px 16px 40px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+    header p { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+
+    /* ── System banner ───────────────────────────────────────── */
+    #system-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 20px;
+      max-width: 760px;
+      margin: 0 auto 28px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .banner-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; } 50% { opacity: .4; }
+    }
+    .dot-ok     { background: var(--ok); }
+    .dot-danger { background: var(--danger); }
+
+    /* ── AC / Relay control ──────────────────────────────────── */
+    .ac-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .ac-label { color: var(--muted); font-size: .85rem; }
+    .ac-value { font-weight: 700; font-size: .95rem; }
+
+    /* Toggle switch */
+    .switch { position: relative; display: inline-block; width: 52px; height: 28px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0;
+      background: var(--border);
+      border-radius: 28px;
+      cursor: pointer;
+      transition: background .25s;
+    }
+    .slider::before {
+      content: '';
+      position: absolute;
+      left: 4px; top: 4px;
+      width: 20px; height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .25s;
+    }
+    input:checked + .slider { background: var(--accent); }
+    input:checked + .slider::before { transform: translateX(24px); }
+
+    /* ── Grid ────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    /* ── Card ────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      transition: border-color .3s;
+    }
+    .card.alert  { border-color: var(--danger); }
+    .card.normal { border-color: var(--border); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .badge {
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .badge-ok     { background: rgba(74,222,128,.15); color: var(--ok);    border: 1px solid rgba(74,222,128,.3); }
+    .badge-alert  { background: rgba(248,113,113,.15); color: var(--danger); border: 1px solid rgba(248,113,113,.3); }
+
+    /* ── Metrics ─────────────────────────────────────────────── */
+    .metrics { display: flex; flex-direction: column; gap: 14px; }
+    .metric { display: flex; align-items: center; gap: 14px; }
+    .metric-icon {
+      font-size: 1.6rem;
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .metric-info { flex: 1; }
+    .metric-label { font-size: .75rem; color: var(--muted); margin-bottom: 2px; }
+    .metric-value { font-size: 1.4rem; font-weight: 700; }
+    .metric-unit  { font-size: .85rem; color: var(--muted); margin-left: 2px; }
+
+    /* threshold bar */
+    .bar-track {
+      height: 5px;
+      background: var(--border);
+      border-radius: 5px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width .4s ease;
+    }
+    .bar-ok     { background: var(--ok);     }
+    .bar-warn   { background: var(--warn);   }
+    .bar-danger { background: var(--danger); }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+    #last-update { font-style: italic; }
+  </style>
 </head>
 
 <body>
+  <header>
+    <h1>🌡 Surveillance Salles – ESP32</h1>
+    <p>DHT22 × 2 &nbsp;|&nbsp; Adafruit IO &amp; Thinger.io &nbsp;|&nbsp; Temps réel</p>
+  </header>
 
-<h1>ESP32 – DHT22 Dashboard</h1>
+  <!-- System banner -->
+  <div id="system-banner">
+    <div class="banner-status">
+      <span class="dot dot-ok" id="system-dot"></span>
+      <span id="system-text">Système Normal</span>
+    </div>
+    <div class="ac-row">
+      <span class="ac-label">Climatisation (relais)</span>
+      <span class="ac-value" id="ac-value">—</span>
+      <label class="switch" title="Activer / désactiver le relais">
+        <input type="checkbox" id="ac-toggle" onchange="toggleAC(this)">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
 
-<div id="salle1" class="card"></div>
-<div id="salle2" class="card"></div>
+  <!-- Sensor cards -->
+  <div class="grid">
+    <!-- Salle 1 -->
+    <div class="card" id="card-s1">
+      <div class="card-header">
+        <span class="card-title">🏫 Salle 1</span>
+        <span class="badge badge-ok" id="badge-s1">Normal</span>
+      </div>
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-icon">🌡</div>
+          <div class="metric-info">
+            <div class="metric-label">Température</div>
+            <div><span class="metric-value" id="t1">—</span><span class="metric-unit">°C</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ok" id="bar-t1" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-icon">💧</div>
+          <div class="metric-info">
+            <div class="metric-label">Humidité</div>
+            <div><span class="metric-value" id="h1">—</span><span class="metric-unit">%</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ok" id="bar-h1" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Salle 2 -->
+    <div class="card" id="card-s2">
+      <div class="card-header">
+        <span class="card-title">🏫 Salle 2</span>
+        <span class="badge badge-ok" id="badge-s2">Normal</span>
+      </div>
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-icon">🌡</div>
+          <div class="metric-info">
+            <div class="metric-label">Température</div>
+            <div><span class="metric-value" id="t2">—</span><span class="metric-unit">°C</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ok" id="bar-t2" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-icon">💧</div>
+          <div class="metric-info">
+            <div class="metric-label">Humidité</div>
+            <div><span class="metric-value" id="h2">—</span><span class="metric-unit">%</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ok" id="bar-h2" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="last-update">En attente de données…</span>
+  </footer>
 
 <script>
+const TEMP_MAX = 30, TEMP_MIN = 15, HUM_MAX = 60;
+
+function tempBar(t) {
+  const pct = Math.min(100, Math.max(0, (t / 40) * 100));
+  const cls = t > TEMP_MAX ? 'bar-danger' : t < TEMP_MIN ? 'bar-warn' : 'bar-ok';
+  return { pct, cls };
+}
+
+function humBar(h) {
+  const pct = Math.min(100, Math.max(0, h));
+  const cls = h > HUM_MAX ? 'bar-danger' : 'bar-ok';
+  return { pct, cls };
+}
+
+function setBar(id, pct, cls) {
+  const el = document.getElementById(id);
+  el.style.width = pct + '%';
+  el.className = 'bar-fill ' + cls;
+}
+
 async function update() {
   try {
-    let res = await fetch("/api/data");
-    let data = await res.json();
+    const res  = await fetch('/api/data');
+    const data = await res.json();
 
-    document.getElementById("salle1").innerHTML = `
-      <div class="title">Salle 1</div>
-      <div class="value">Température: ${data.salle1.temp} °C</div>
-      <div class="value">Humidité: ${data.salle1.hum} %</div>
-      <div class="value">Statut: ${data.salle1.status}</div>
-    `;
+    const s1 = data.salle1, s2 = data.salle2;
 
-    document.getElementById("salle2").innerHTML = `
-      <div class="title">Salle 2</div>
-      <div class="value">Température: ${data.salle2.temp} °C</div>
-      <div class="value">Humidité: ${data.salle2.hum} %</div>
-      <div class="value">Statut: ${data.salle2.status}</div>
-    `;
+    // Values
+    document.getElementById('t1').textContent = s1.temp;
+    document.getElementById('h1').textContent = s1.hum;
+    document.getElementById('t2').textContent = s2.temp;
+    document.getElementById('h2').textContent = s2.hum;
+
+    // Bars
+    const bt1 = tempBar(s1.temp); setBar('bar-t1', bt1.pct, bt1.cls);
+    const bh1 = humBar(s1.hum);   setBar('bar-h1', bh1.pct, bh1.cls);
+    const bt2 = tempBar(s2.temp); setBar('bar-t2', bt2.pct, bt2.cls);
+    const bh2 = humBar(s2.hum);   setBar('bar-h2', bh2.pct, bh2.cls);
+
+    // Card badges
+    ['s1','s2'].forEach(k => {
+      const s     = k === 's1' ? s1 : s2;
+      const card  = document.getElementById('card-'  + k);
+      const badge = document.getElementById('badge-' + k);
+      if (s.status === 'ALERTE') {
+        card.className  = 'card alert';
+        badge.className = 'badge badge-alert';
+        badge.textContent = '⚠ Alerte';
+      } else {
+        card.className  = 'card normal';
+        badge.className = 'badge badge-ok';
+        badge.textContent = 'Normal';
+      }
+    });
+
+    // System banner
+    const dot  = document.getElementById('system-dot');
+    const txt  = document.getElementById('system-text');
+    if (data.alert) {
+      dot.className = 'dot dot-danger';
+      txt.textContent = '⚠  ALERTE ACTIVE';
+    } else {
+      dot.className = 'dot dot-ok';
+      txt.textContent = 'Système Normal';
+    }
+
+    // AC toggle
+    const toggle = document.getElementById('ac-toggle');
+    toggle.checked = data.ac;
+    document.getElementById('ac-value').textContent = data.ac ? 'ON' : 'OFF';
+
+    // Timestamp
+    document.getElementById('last-update').textContent =
+      'Mise à jour : ' + new Date().toLocaleTimeString('fr-FR');
+
   } catch (e) {
-    document.getElementById("salle1").innerHTML = "<b>Erreur : ESP32 introuvable</b>";
+    document.getElementById('system-text').textContent = 'ESP32 introuvable…';
+  }
+}
+
+async function toggleAC(el) {
+  try {
+    const body = new URLSearchParams({ state: el.checked ? '1' : '0' });
+    await fetch('/api/relay', { method: 'POST', body });
+    document.getElementById('ac-value').textContent = el.checked ? 'ON' : 'OFF';
+  } catch (e) {
+    el.checked = !el.checked; // revert toggle on error
+    document.getElementById('ac-value').textContent = el.checked ? 'ON' : 'OFF';
   }
 }
 
 setInterval(update, 2000);
 update();
 </script>
-
 </body>
 </html>
